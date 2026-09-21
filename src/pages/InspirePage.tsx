@@ -8,7 +8,8 @@ import {
   formatTimestamp,
   getTimeOfDay,
 } from '@/utils/sceneHelpers'
-import { Lightbulb, RefreshCw, Quote, Bus, ArrowRight } from 'lucide-react'
+import { Lightbulb, RefreshCw, Quote, Bus, ArrowRight, Star } from 'lucide-react'
+import { isStarredScene } from '@/utils/sceneRules'
 
 export default function InspirePage() {
   const { randomScene, refreshRandom, loadAll, scenes } = useSceneStore()
@@ -84,6 +85,10 @@ export default function InspirePage() {
             <span className="text-mist-100 font-serif text-lg tracking-wide">采一段窗景</span>
             <span className="text-dusk-400/60 text-xs">点击随机采集</span>
           </button>
+          <p className="mt-5 flex items-center gap-1.5 text-mist-500 text-xs font-serif">
+            <Star className="w-3 h-3 text-dusk-400/70" />
+            优先从标记为重点的记录中抽取
+          </p>
           <style>{`
             @keyframes float {
               0%, 100% { transform: translateY(0); }
@@ -113,6 +118,12 @@ export default function InspirePage() {
                 <span>{randomScene.segment}</span>
               </div>
               <div className="flex items-center gap-2">
+                {isStarredScene(randomScene) && (
+                  <span className="flex items-center gap-1 rounded-full bg-dusk-400/15 px-2 py-0.5 text-[10px] text-dusk-300">
+                    <Star className="w-3 h-3 fill-dusk-400 text-dusk-400" />
+                    重点
+                  </span>
+                )}
                 <span>{getTimeOfDay(randomScene.timestamp)}</span>
                 <span className="text-mist-500">·</span>
                 <span>{formatTimestamp(randomScene.timestamp).split(' ')[1]}</span>

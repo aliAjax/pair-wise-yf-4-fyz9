@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Route, X, Trash2, Clock, MapPin } from 'lucide-react'
+import { Search, Route, X, Trash2, Clock, MapPin, Star } from 'lucide-react'
 import { useSceneStore } from '@/store/useSceneStore'
 import {
   formatTimestamp,
@@ -8,30 +8,51 @@ import {
   getTreeIcon,
   getPedestrianIcon,
 } from '@/utils/sceneHelpers'
-import type { WindowScene } from '@/types'
+import { filterScenes, sortByTimeDesc, isStarredScene } from '@/utils/sceneRules'
 
 export default function TimelinePage() {
-  const { routeNames, selectedRoute, currentRouteScenes, selectRoute, loadAll, deleteScene } =
-    useSceneStore()
+  const {
+    scenes,
+    routeNames,
+    selectedRoute,
+    onlyStarred,
+    selectRoute,
+    toggleOnlyStarred,
+    toggleStar,
+    loadAll,
+    deleteScene,
+  } = useSceneStore()
   const [search, setSearch] = useState('')
-  const [detailScene, setDetailScene] = useState<WindowScene | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   useEffect(() => {
     loadAll()
   }, [loadAll])
 
+  // 线路条件和只看重点同时生效；清空线路后重点条件仍保留
+  const visibleScenes = sortByTimeDesc(
+    filterScenes(scenes, { routeName: selectedRoute, onlyStarred })
+  )
+
+  // 从列表实时取详情，点星、删除后弹窗内容立即同步
+  const detailScene = detailId ? scenes.find((s) => s.id === detailId) ?? null : null
+
   const filteredRoutes = routeNames.filter((r) =>
     r.toLowerCase().includes(search.toLowerCase())
   )
 
-  const sorted = [...currentRouteScenes].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  )
-
   const handleDelete = (id: string) => {
     deleteScene(id)
-    setDetailScene(null)
+    setDetailId(null)
   }
+
+  const emptyText = onlyStarred
+    ? selectedRoute
+      ? '该路线暂无重点窗景记录'
+      : '还没有标记为重点的窗景记录'
+    : selectedRoute
+      ? '该路线暂无窗景记录'
+      : '选择一条路线，开始浏览窗景'
 
   return (
     <div className="min-h-screen bg-teal-950 font-serif text-mist-100">
@@ -77,63 +98,104 @@ export default function TimelinePage() {
               </button>
             ))}
           </div>
+          <div className="flex justify-end">
+            <button
+              onClick={toggleOnlyStarred}
+              aria-pressed={onlyStarred}
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs transition-colors ${
+                onlyStarred
+                  ? 'bg-dusk-400/20 text-dusk-300 ring-1 ring-dusk-400'
+                  : 'bg-teal-900 text-mist-300 hover:bg-teal-800'
+              }`}
+            >
+              <Star
+                className={`w-3.5 h-3.5 ${onlyStarred ? 'fill-dusk-400 text-dusk-400' : ''}`}
+              />
+              只看重点
+            </button>
+          </div>
         </div>
 
-        {sorted.length === 0 ? (
+        {visibleScenes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-mist-400">
             <div className="mb-4 text-6xl opacity-30">🪟</div>
-            <p className="text-lg">
-              {selectedRoute ? '该路线暂无窗景记录' : '选择一条路线，开始浏览窗景'}
-            </p>
+            <p className="text-lg">{emptyText}</p>
           </div>
         ) : (
           <div className="relative pl-8">
             <div className="absolute left-3 top-0 bottom-0 w-px bg-teal-800" />
             <div className="space-y-6">
-              {sorted.map((scene) => (
-                <div key={scene.id} className="relative flex gap-4">
-                  <div className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-dusk-400 ring-4 ring-teal-950" />
-                  <div className="w-20 shrink-0 pt-0.5 text-right">
-                    <p className="text-xs text-dusk-400">
-                      {formatTimestamp(scene.timestamp)}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-mist-500">
-                      {getTimeOfDay(scene.timestamp)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setDetailScene(scene)}
-                    className="group flex-1 rounded-xl border border-teal-800 bg-teal-900/50 p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-dusk-400/40 hover:shadow-lg hover:shadow-dusk-400/10"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      {getWeatherIcon(scene.weather)}
-                      <span className="text-sm font-semibold text-mist-100">
-                        {scene.segment}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 mb-1.5 text-mist-400">
-                      <MapPin className="w-3 h-3" />
-                      <span className="text-xs">{scene.routeName}</span>
-                      <span className="mx-1 text-teal-700">·</span>
-                      <span className="text-xs">{scene.seatDirection}侧</span>
-                    </div>
-                    {scene.note && (
-                      <p className="text-xs text-mist-400 line-clamp-2">
-                        {scene.note}
+              {visibleScenes.map((scene) => {
+                const starred = isStarredScene(scene)
+                return (
+                  <div key={scene.id} className="relative flex gap-4">
+                    <div
+                      className={`absolute -left-5 top-1 h-2.5 w-2.5 rounded-full ring-4 ring-teal-950 ${
+                        starred ? 'bg-dusk-400' : 'bg-dusk-400/60'
+                      }`}
+                    />
+                    <div className="w-20 shrink-0 pt-0.5 text-right">
+                      <p className="text-xs text-dusk-400">
+                        {formatTimestamp(scene.timestamp)}
                       </p>
-                    )}
-                    <div className="mt-2 flex items-center gap-2">
-                      {getTreeIcon(scene.treeDensity)}
-                      {getPedestrianIcon(scene.pedestrianStatus)}
-                      {scene.signText && (
-                        <span className="rounded bg-teal-800/60 px-1.5 py-0.5 text-[10px] text-mist-300">
-                          {scene.signText}
-                        </span>
-                      )}
+                      <p className="mt-0.5 text-[10px] text-mist-500">
+                        {getTimeOfDay(scene.timestamp)}
+                      </p>
                     </div>
-                  </button>
-                </div>
-              ))}
+                    <div
+                      className={`group relative flex-1 rounded-xl border bg-teal-900/50 p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-dusk-400/10 ${
+                        starred
+                          ? 'border-dusk-400/50 hover:border-dusk-400/70'
+                          : 'border-teal-800 hover:border-dusk-400/40'
+                      }`}
+                    >
+                      <button
+                        onClick={() => toggleStar(scene.id)}
+                        aria-label={starred ? '取消重点标记' : '标记为重点'}
+                        title={starred ? '取消重点' : '标为重点'}
+                        className="absolute right-3 top-3 text-mist-500 transition-colors hover:text-dusk-400"
+                      >
+                        <Star
+                          className={`w-4 h-4 ${
+                            starred ? 'fill-dusk-400 text-dusk-400' : ''
+                          }`}
+                        />
+                      </button>
+                      <button
+                        onClick={() => setDetailId(scene.id)}
+                        className="block w-full pr-7 text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          {getWeatherIcon(scene.weather)}
+                          <span className="text-sm font-semibold text-mist-100">
+                            {scene.segment}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mb-1.5 text-mist-400">
+                          <MapPin className="w-3 h-3" />
+                          <span className="text-xs">{scene.routeName}</span>
+                          <span className="mx-1 text-teal-700">·</span>
+                          <span className="text-xs">{scene.seatDirection}侧</span>
+                        </div>
+                        {scene.note && (
+                          <p className="text-xs text-mist-400 line-clamp-2">
+                            {scene.note}
+                          </p>
+                        )}
+                        <div className="mt-2 flex items-center gap-2">
+                          {getTreeIcon(scene.treeDensity)}
+                          {getPedestrianIcon(scene.pedestrianStatus)}
+                          {scene.signText && (
+                            <span className="rounded bg-teal-800/60 px-1.5 py-0.5 text-[10px] text-mist-300">
+                              {scene.signText}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -142,22 +204,43 @@ export default function TimelinePage() {
       {detailScene && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={() => setDetailScene(null)}
+          onClick={() => setDetailId(null)}
         >
           <div
             className="relative mx-4 w-full max-w-md animate-scale-in rounded-2xl border border-teal-700 bg-teal-900 p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setDetailScene(null)}
-              className="absolute right-4 top-4 text-mist-400 hover:text-mist-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="absolute right-4 top-4 flex items-center gap-3">
+              <button
+                onClick={() => toggleStar(detailScene.id)}
+                aria-label="切换重点标记"
+                className="text-mist-400 transition-colors hover:text-dusk-400"
+              >
+                <Star
+                  className={`w-5 h-5 ${
+                    isStarredScene(detailScene)
+                      ? 'fill-dusk-400 text-dusk-400'
+                      : ''
+                  }`}
+                />
+              </button>
+              <button
+                onClick={() => setDetailId(null)}
+                className="text-mist-400 hover:text-mist-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <div className="mb-4 flex items-center gap-3">
+            <div className="mb-4 flex items-center gap-3 pr-16">
               {getWeatherIcon(detailScene.weather)}
               <h2 className="text-xl font-bold text-dusk-400">{detailScene.segment}</h2>
+              {isStarredScene(detailScene) && (
+                <span className="flex items-center gap-1 rounded-full bg-dusk-400/15 px-2 py-0.5 text-[10px] text-dusk-300">
+                  <Star className="w-3 h-3 fill-dusk-400 text-dusk-400" />
+                  重点
+                </span>
+              )}
             </div>
 
             <div className="space-y-3 text-sm">

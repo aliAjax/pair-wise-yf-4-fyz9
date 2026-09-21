@@ -17,6 +17,8 @@ export interface WindowScene {
   treeDensity: TreeDensity
   pedestrianStatus: PedestrianStatus
   note: string
+  // 重点标记；旧记录可能没有此字段，由规则层按普通记录处理
+  isStarred?: boolean
 }
 
 export interface SceneFormData {
