@@ -17,6 +17,8 @@ export interface WindowScene {
   treeDensity: TreeDensity
   pedestrianStatus: PedestrianStatus
   note: string
+  /** 是否为重点记录；旧数据可能缺省，读取时按 false 归一化 */
+  isHighlight: boolean
 }
 
 export interface SceneFormData {

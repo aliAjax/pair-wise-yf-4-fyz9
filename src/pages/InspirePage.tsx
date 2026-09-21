@@ -8,7 +8,8 @@ import {
   formatTimestamp,
   getTimeOfDay,
 } from '@/utils/sceneHelpers'
-import { Lightbulb, RefreshCw, Quote, Bus, ArrowRight } from 'lucide-react'
+import { Lightbulb, RefreshCw, Quote, Bus, ArrowRight, Star } from 'lucide-react'
+import { isHighlightScene } from '@/utils/sceneRules'
 
 export default function InspirePage() {
   const { randomScene, refreshRandom, loadAll, scenes } = useSceneStore()
@@ -20,6 +21,8 @@ export default function InspirePage() {
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  const highlightCount = scenes.filter(isHighlightScene).length
 
   useEffect(() => {
     if (!revealed || !randomScene) return
@@ -82,7 +85,11 @@ export default function InspirePage() {
             <div className="absolute inset-3 rounded-full border border-dusk-400/20" />
             <Bus className="w-10 h-10 text-dusk-400 group-hover:scale-110 transition-transform duration-300" />
             <span className="text-mist-100 font-serif text-lg tracking-wide">采一段窗景</span>
-            <span className="text-dusk-400/60 text-xs">点击随机采集</span>
+            <span className="text-dusk-400/60 text-xs">
+              {highlightCount > 0
+                ? `将从 ${highlightCount} 条重点记录中随机采集`
+                : '暂无重点，将从全部记录中随机采集'}
+            </span>
           </button>
           <style>{`
             @keyframes float {
@@ -111,6 +118,9 @@ export default function InspirePage() {
                 <span className="text-mist-100 font-medium">{randomScene.routeName}</span>
                 <span className="text-mist-500">·</span>
                 <span>{randomScene.segment}</span>
+                {isHighlightScene(randomScene) && (
+                  <Star className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span>{getTimeOfDay(randomScene.timestamp)}</span>

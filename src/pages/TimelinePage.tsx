@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Route, X, Trash2, Clock, MapPin } from 'lucide-react'
+import { Search, Route, X, Trash2, Clock, MapPin, Star } from 'lucide-react'
 import { useSceneStore } from '@/store/useSceneStore'
 import {
   formatTimestamp,
@@ -8,11 +8,21 @@ import {
   getTreeIcon,
   getPedestrianIcon,
 } from '@/utils/sceneHelpers'
+import { filterScenes } from '@/utils/sceneRules'
 import type { WindowScene } from '@/types'
 
 export default function TimelinePage() {
-  const { routeNames, selectedRoute, currentRouteScenes, selectRoute, loadAll, deleteScene } =
-    useSceneStore()
+  const {
+    scenes,
+    routeNames,
+    selectedRoute,
+    highlightOnly,
+    selectRoute,
+    toggleHighlightOnly,
+    toggleHighlight,
+    loadAll,
+    deleteScene,
+  } = useSceneStore()
   const [search, setSearch] = useState('')
   const [detailScene, setDetailScene] = useState<WindowScene | null>(null)
 
@@ -24,14 +34,21 @@ export default function TimelinePage() {
     r.toLowerCase().includes(search.toLowerCase())
   )
 
-  const sorted = [...currentRouteScenes].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  )
+  // 线路条件与"只看重点"在规则层取交集；删除/改标记后 scenes 更新，结果立即一致
+  const visibleScenes = filterScenes(scenes, selectedRoute, highlightOnly)
 
   const handleDelete = (id: string) => {
     deleteScene(id)
     setDetailScene(null)
   }
+
+  const emptyText = selectedRoute
+    ? highlightOnly
+      ? '该线路暂无重点窗景记录'
+      : '该路线暂无窗景记录'
+    : highlightOnly
+      ? '还没有标记为重点的窗景'
+      : '选择一条路线，开始浏览窗景'
 
   return (
     <div className="min-h-screen bg-teal-950 font-serif text-mist-100">
@@ -51,7 +68,7 @@ export default function TimelinePage() {
               className="w-full rounded-lg border border-teal-800 bg-teal-900/60 py-2.5 pl-10 pr-4 text-sm text-mist-100 placeholder:text-mist-500 focus:border-dusk-400 focus:outline-none"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => selectRoute('')}
               className={`rounded-full px-3.5 py-1.5 text-xs transition-colors ${
@@ -76,23 +93,39 @@ export default function TimelinePage() {
                 {name}
               </button>
             ))}
+            {/* 清空线路后该开关仍保留，与线路条件同时生效 */}
+            <button
+              onClick={toggleHighlightOnly}
+              className={`ml-auto flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs transition-colors ${
+                highlightOnly
+                  ? 'bg-dusk-400 text-teal-950'
+                  : 'bg-teal-900 text-mist-300 hover:bg-teal-800'
+              }`}
+            >
+              <Star
+                className={`w-3 h-3 ${highlightOnly ? 'fill-teal-950' : ''}`}
+              />
+              只看重点
+            </button>
           </div>
         </div>
 
-        {sorted.length === 0 ? (
+        {visibleScenes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-mist-400">
             <div className="mb-4 text-6xl opacity-30">🪟</div>
-            <p className="text-lg">
-              {selectedRoute ? '该路线暂无窗景记录' : '选择一条路线，开始浏览窗景'}
-            </p>
+            <p className="text-lg">{emptyText}</p>
           </div>
         ) : (
           <div className="relative pl-8">
             <div className="absolute left-3 top-0 bottom-0 w-px bg-teal-800" />
             <div className="space-y-6">
-              {sorted.map((scene) => (
+              {visibleScenes.map((scene) => (
                 <div key={scene.id} className="relative flex gap-4">
-                  <div className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-dusk-400 ring-4 ring-teal-950" />
+                  <div
+                    className={`absolute -left-5 top-1 h-2.5 w-2.5 rounded-full ring-4 ring-teal-950 ${
+                      scene.isHighlight ? 'bg-amber-300' : 'bg-dusk-400'
+                    }`}
+                  />
                   <div className="w-20 shrink-0 pt-0.5 text-right">
                     <p className="text-xs text-dusk-400">
                       {formatTimestamp(scene.timestamp)}
@@ -101,15 +134,41 @@ export default function TimelinePage() {
                       {getTimeOfDay(scene.timestamp)}
                     </p>
                   </div>
-                  <button
+                  <div
                     onClick={() => setDetailScene(scene)}
-                    className="group flex-1 rounded-xl border border-teal-800 bg-teal-900/50 p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-dusk-400/40 hover:shadow-lg hover:shadow-dusk-400/10"
+                    className={`group flex-1 cursor-pointer rounded-xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+                      scene.isHighlight
+                        ? 'border-amber-300/40 bg-amber-300/5 hover:border-amber-300/60 hover:shadow-amber-300/10'
+                        : 'border-teal-800 bg-teal-900/50 hover:border-dusk-400/40 hover:shadow-dusk-400/10'
+                    }`}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      {getWeatherIcon(scene.weather)}
-                      <span className="text-sm font-semibold text-mist-100">
-                        {scene.segment}
-                      </span>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        {getWeatherIcon(scene.weather)}
+                        <span className="text-sm font-semibold text-mist-100">
+                          {scene.segment}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={scene.isHighlight ? '取消重点' : '标为重点'}
+                        aria-pressed={scene.isHighlight}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleHighlight(scene.id)
+                        }}
+                        className={`shrink-0 rounded-md p-1 transition-colors ${
+                          scene.isHighlight
+                            ? 'text-amber-300 hover:text-amber-200'
+                            : 'text-mist-500 hover:text-amber-300'
+                        }`}
+                      >
+                        <Star
+                          className={`w-4 h-4 transition-transform hover:scale-110 ${
+                            scene.isHighlight ? 'fill-amber-300' : ''
+                          }`}
+                        />
+                      </button>
                     </div>
                     <div className="flex items-center gap-1 mb-1.5 text-mist-400">
                       <MapPin className="w-3 h-3" />
@@ -131,7 +190,7 @@ export default function TimelinePage() {
                         </span>
                       )}
                     </div>
-                  </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -158,6 +217,9 @@ export default function TimelinePage() {
             <div className="mb-4 flex items-center gap-3">
               {getWeatherIcon(detailScene.weather)}
               <h2 className="text-xl font-bold text-dusk-400">{detailScene.segment}</h2>
+              {detailScene.isHighlight && (
+                <Star className="w-5 h-5 fill-amber-300 text-amber-300" />
+              )}
             </div>
 
             <div className="space-y-3 text-sm">
